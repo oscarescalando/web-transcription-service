@@ -4,7 +4,8 @@ Este proyecto implementa una API RESTful utilizando Python y FastAPI para transc
 
 ## Características
 
--   **API Segura**: Todos los endpoints están protegidos con autenticación de Token Bearer.
+-   **API Segura**: Los endpoints principales están protegidos con autenticación de Token Bearer.
+-   **Endpoint de Health Check**: Incluye un endpoint público `/ping` para verificar el estado del servicio.
 -   **Configuración Segura**: El token de la API se gestiona a través de un archivo `.env` para no exponerlo en el código.
 -   **API de Transcripción de Archivos**: Endpoint `/upload-file-transcribe` para procesar archivos multimedia.
 -   **API de Transcripción de YouTube**: Endpoint `/youtube-url-transcribe` para procesar URLs de videos de YouTube.
@@ -77,11 +78,27 @@ La API estará disponible en `http://127.0.0.1:8000`.
 
 ## Cómo Usar la API
 
-Para interactuar con los endpoints, necesitas incluir tu token en la cabecera de autorización.
+### API 1: Verificación de Estado (`/ping`)
 
-**Cabecera de Autorización:** `Authorization: Bearer TU_TOKEN_SECRETO`
+Este endpoint es público y no necesita autenticación. Sirve para confirmar que la API está en línea y funcionando.
 
-### API 1: Transcribir Archivo (`/upload-file-transcribe`)
+-   **Método**: `GET`
+-   **Ejemplo con `curl`**:
+    ```bash
+    curl -X GET "http://127.0.0.1:8000/ping"
+    ```
+
+-   **Respuesta Exitosa (JSON)**:
+    ```json
+    {
+      "status": "success",
+      "message": "API is active and running"
+    }
+    ```
+
+### API 2: Transcribir Archivo (`/upload-file-transcribe`)
+
+Para este y los siguientes endpoints, necesitas incluir tu token en la cabecera de autorización: `Authorization: Bearer TU_TOKEN_SECRETO`.
 
 -   **Método**: `POST`
 -   **Descripción**: Sube un archivo de audio o video.
@@ -99,7 +116,7 @@ Para interactuar con los endpoints, necesitas incluir tu token en la cabecera de
     }
     ```
 
-### API 2: Transcribir URL de YouTube (`/youtube-url-transcribe`)
+### API 3: Transcribir URL de YouTube (`/youtube-url-transcribe`)
 
 -   **Método**: `POST`
 -   **Descripción**: Envía una URL de YouTube en un cuerpo JSON.
@@ -124,6 +141,3 @@ Una vez que el servidor esté en funcionamiento, puedes explorar y probar la API
 
 -   **Swagger UI**: `http://127.0.0.1:8000/docs`
 -   **ReDoc**: `http://127.0.0.1:8000/redoc`
-
-Desde estas interfaces puedes probar los endpoints, y Swagger UI gestionará automáticamente el token de autorización por ti si haces clic en el botón "Authorize".
-

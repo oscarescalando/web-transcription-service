@@ -1,5 +1,3 @@
-# main.py
-
 import os
 import shutil
 import tempfile
@@ -8,8 +6,7 @@ from typing import Annotated
 import whisper
 import yt_dlp
 from dotenv import load_dotenv
-from fastapi import (FastAPI, File, Form, HTTPException, UploadFile, Depends,
-                     Security)
+from fastapi import (FastAPI, File, HTTPException, UploadFile, Depends)
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
@@ -21,14 +18,18 @@ load_dotenv()
 # Inicializar la aplicación FastAPI
 app = FastAPI(
     title="API de Transcripción de Audio/Video",
-    description="Procesa archivos y URLs de YouTube para transcribir su contenido a texto.",
-    version="1.0.0"
+    description=(
+        "Procesa archivos y URLs de YouTube para transcribir su "
+        "contenido a texto."
+    ),
+    version="1.0.1"
 )
 
 # Cargar el modelo de Whisper.
 # Se recomienda 'base' para un buen equilibrio entre rendimiento y precisión.
 # Otros modelos disponibles: 'tiny', 'small', 'medium', 'large'.
-# El modelo se carga una sola vez al iniciar la aplicación para mayor eficiencia.
+# El modelo se carga una sola vez al iniciar la aplicación para mayor
+# eficiencia.
 print("Cargando el modelo de Whisper...")
 try:
     model = whisper.load_model("base")
@@ -49,14 +50,24 @@ security = HTTPBearer()
 API_TOKEN = os.getenv("API_TOKEN")
 
 if not API_TOKEN:
-    raise ValueError("La variable de entorno API_TOKEN no está configurada. Por favor, créala en el archivo .env.")
+    raise ValueError(
+        "La variable de entorno API_TOKEN no está configurada. "
+        "Por favor, créala en el archivo .env."
+    )
 
 # Función de dependencia para validar el token
-def get_current_token(credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)]):
+  
+  
+def get_current_token(
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)]
+):
     """
     Valida el token Bearer proporcionado en la cabecera Authorization.
     """
-    if not credentials or credentials.scheme != "Bearer" or credentials.credentials != API_TOKEN:
+    if (
+        not credentials or credentials.scheme != "Bearer" or
+        credentials.credentials != API_TOKEN
+    ):
         raise HTTPException(
             status_code=403,
             detail="Token inválido o ausente."
@@ -65,16 +76,25 @@ def get_current_token(credentials: Annotated[HTTPAuthorizationCredentials, Depen
 
 # --- Modelos de Datos (Pydantic) ---
 
+  
 class TranscriptionResponse(BaseModel):
     """Modelo de respuesta para las transcripciones."""
     transcription: str
 
+  
 class YouTubeURLRequest(BaseModel):
     """Modelo de solicitud para la URL de YouTube."""
     url: str
 
+  
+class PingResponse(BaseModel):
+    """Modelo de respuesta para el endpoint de ping."""
+    status: str
+    message: str
+
 # --- Lógica de Transcripción ---
 
+  
 def transcribe_audio_file(file_path: str) -> str:
     """
     Función auxiliar para transcribir un archivo de audio usando Whisper.
@@ -90,18 +110,43 @@ def transcribe_audio_file(file_path: str) -> str:
         return result["text"]
     except Exception as e:
         # Captura errores específicos de Whisper si es necesario
-        raise HTTPException(status_code=500, detail=f"Error durante la transcripción: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error durante la transcripción: {str(e)}"
+        )
 
 
 # --- Endpoints de la API ---
 
+@app.get(
+    "/ping",
+    response_model=PingResponse,
+    summary="Verificar el estado del servicio",
+    tags=["Health Check"]
+)
+async def ping():
+    """
+    Endpoint público para verificar que la API está activa y funcionando.
+    No requiere autenticación.
+    """
+    # Se verifica implícitamente que el modelo de Whisper esté cargado,
+    # ya que si falla la carga, la app no se inicia.
+    return {"status": "success", "message": "API is active and running"}
+
+  
 @app.post(
     "/upload-file-transcribe",
     response_model=TranscriptionResponse,
     summary="Transcribir un archivo de audio/video",
-    dependencies=[Depends(get_current_token)]
+    dependencies=[Depends(get_current_token)],
+    tags=["Transcription"]
 )
-async def upload_file_transcribe(file: Annotated[UploadFile, File(description="Archivo de audio o video a transcribir.")]):
+async def upload_file_transcribe(
+    file: Annotated[
+        UploadFile,
+        File(description="Archivo de audio o video a transcribir.")
+    ]
+):
     """
     Sube un archivo multimedia, extrae el audio y lo transcribe a texto.
     
@@ -109,7 +154,9 @@ async def upload_file_transcribe(file: Annotated[UploadFile, File(description="A
     - **Archivo**: Acepta formatos de audio y video compatibles con ffmpeg.
     """
     # Crear un archivo temporal para guardar el contenido subido
-    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as tmp_file:
+    with tempfile.NamedTemporaryFile(
+        delete=False, suffix=os.path.splitext(file.filename)[1]
+    ) as tmp_file:
         # Guardar el contenido del archivo subido en el archivo temporal
         shutil.copyfileobj(file.file, tmp_file)
         tmp_file_path = tmp_file.name
@@ -128,11 +175,13 @@ async def upload_file_transcribe(file: Annotated[UploadFile, File(description="A
     "/youtube-url-transcribe",
     response_model=TranscriptionResponse,
     summary="Transcribir audio de una URL de YouTube",
-    dependencies=[Depends(get_current_token)]
+    dependencies=[Depends(get_current_token)],
+    tags=["Transcription"]
 )
 async def youtube_url_transcribe(request: YouTubeURLRequest):
     """
-    Descarga el audio de un video de YouTube, lo transcribe y devuelve el texto.
+    Descarga el audio de un video de YouTube, lo transcribe y
+    devuelve el texto.
 
     - **Autenticación**: Requiere un Token Bearer.
     - **URL**: La URL completa del video de YouTube.
@@ -156,18 +205,32 @@ async def youtube_url_transcribe(request: YouTubeURLRequest):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info_dict = ydl.extract_info(request.url, download=True)
             # Construir la ruta del archivo descargado
-            downloaded_file_path = ydl.prepare_filename(info_dict).replace(os.path.splitext(ydl.prepare_filename(info_dict))[1], ".mp3")
+            downloaded_file_path = ydl.prepare_filename(info_dict).replace(
+                os.path.splitext(ydl.prepare_filename(info_dict))[1], ".mp3"
+            )
 
         if not os.path.exists(downloaded_file_path):
-             raise HTTPException(status_code=500, detail="No se pudo descargar o encontrar el archivo de audio de YouTube.")
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "No se pudo descargar o encontrar o "
+                    "encontrar el archivo de audio de YouTube."
+                )
+            )
 
         # Realizar la transcripción del archivo descargado
         transcribed_text = transcribe_audio_file(downloaded_file_path)
 
     except yt_dlp.utils.DownloadError as e:
-        raise HTTPException(status_code=400, detail=f"Error al descargar el video de YouTube: {str(e)}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Error al descargar el video de YouTube: {str(e)}"
+        )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ocurrió un error inesperado: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Ocurrió un error inesperado: {str(e)}"
+        )
     finally:
         # Limpiar el directorio temporal y su contenido
         if os.path.exists(temp_dir):
@@ -175,6 +238,12 @@ async def youtube_url_transcribe(request: YouTubeURLRequest):
 
     return {"transcription": transcribed_text}
 
+  
 @app.get("/", summary="Endpoint de Bienvenida", include_in_schema=False)
 def read_root():
-    return {"message": "Bienvenido a la API de Transcripción. Visita /docs para ver la documentación."}
+    return {
+        "message": (
+            "Bienvenido a la API de Transcripción. "
+            "Visita /docs para ver la documentación."
+        )
+    }
