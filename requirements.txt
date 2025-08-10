@@ -7,3 +7,4 @@ python-multipart
 openai-whisper
 yt-dlp
 ffmpeg-python
+hypercorn==0.14.4
