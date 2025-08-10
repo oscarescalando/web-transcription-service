@@ -42,7 +42,6 @@ except Exception as e:
 
 
 # --- Seguridad: Autenticación con Token Bearer ---
-
 # Esquema de seguridad para el token Bearer
 security = HTTPBearer()
 
@@ -56,7 +55,6 @@ if not API_TOKEN:
     )
 
 # Función de dependencia para validar el token
-  
   
 def get_current_token(
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)]
@@ -76,12 +74,12 @@ def get_current_token(
 
 # --- Modelos de Datos (Pydantic) ---
 
-  
+
 class TranscriptionResponse(BaseModel):
     """Modelo de respuesta para las transcripciones."""
     transcription: str
 
-  
+ 
 class YouTubeURLRequest(BaseModel):
     """Modelo de solicitud para la URL de YouTube."""
     url: str
