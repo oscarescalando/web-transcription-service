@@ -151,19 +151,27 @@ async def upload_file_transcribe(
     - **Autenticación**: Requiere un Token Bearer.
     - **Archivo**: Acepta formatos de audio y video compatibles con ffmpeg.
     """
+    print(f"Recibiendo archivo: {file.filename}")
     # Crear un archivo temporal para guardar el contenido subido
     with tempfile.NamedTemporaryFile(
         delete=False, suffix=os.path.splitext(file.filename)[1]
     ) as tmp_file:
+        print(f"Guardando archivo temporal en: {tmp_file.name}")
         # Guardar el contenido del archivo subido en el archivo temporal
         shutil.copyfileobj(file.file, tmp_file)
         tmp_file_path = tmp_file.name
 
     try:
+        print(f"Iniciando transcripción del archivo: {tmp_file_path}")
         # Realizar la transcripción
         transcribed_text = transcribe_audio_file(tmp_file_path)
+        print("Transcripción completada exitosamente.")
+    except Exception as e:
+        print(f"Error durante la transcripción: {e}")
+        raise
     finally:
         # Asegurarse de que el archivo temporal se elimine después de su uso
+        print(f"Eliminando archivo temporal: {tmp_file_path}")
         os.unlink(tmp_file_path)
         
     return {"transcription": transcribed_text}
