@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from fastapi import (FastAPI, File, HTTPException, UploadFile, Depends)
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
+import logging
 
 # --- Configuración Inicial ---
 
@@ -192,9 +193,21 @@ async def youtube_url_transcribe(request: YouTubeURLRequest):
     - **Autenticación**: Requiere un Token Bearer.
     - **URL**: La URL completa del video de YouTube.
     """
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger("yt_transcribe")
+
+    logger.info(f"Recibida URL de YouTube: {request.url}")
+
+    # Leer la ruta de cookies desde la variable de entorno (opcional)
+    YT_COOKIES_PATH = os.getenv("YT_COOKIES_PATH")
+    if YT_COOKIES_PATH and not os.path.exists(YT_COOKIES_PATH):
+        logger.warning(f"El archivo de cookies especificado no existe: {YT_COOKIES_PATH}")
+        YT_COOKIES_PATH = None
+
     # Crear un directorio temporal para la descarga
     temp_dir = tempfile.mkdtemp()
-    
+    logger.info(f"Directorio temporal creado: {temp_dir}")
+
     ydl_opts = {
         'format': 'bestaudio/best',
         'outtmpl': os.path.join(temp_dir, '%(title)s.%(ext)s'),
@@ -204,35 +217,48 @@ async def youtube_url_transcribe(request: YouTubeURLRequest):
             'preferredquality': '192',
         }],
         'quiet': True,
+        'noplaylist': True,
     }
+    if YT_COOKIES_PATH:
+        ydl_opts['cookiesfrombrowser'] = ('chrome',)  # fallback if path not set
+        ydl_opts['cookiefile'] = YT_COOKIES_PATH
+        logger.info(f"Usando cookies de: {YT_COOKIES_PATH}")
 
     try:
-        # Descargar el audio usando yt-dlp
+        logger.info("Iniciando descarga de audio con yt-dlp...")
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info_dict = ydl.extract_info(request.url, download=True)
-            # Construir la ruta del archivo descargado
             downloaded_file_path = ydl.prepare_filename(info_dict).replace(
                 os.path.splitext(ydl.prepare_filename(info_dict))[1], ".mp3"
             )
+        logger.info(f"Archivo descargado: {downloaded_file_path}")
 
         if not os.path.exists(downloaded_file_path):
+            logger.error("No se encontró el archivo descargado.")
             raise HTTPException(
                 status_code=500,
                 detail=(
-                    "No se pudo descargar o encontrar o "
-                    "encontrar el archivo de audio de YouTube."
+                    "No se pudo descargar o encontrar el archivo de audio de YouTube."
                 )
             )
 
-        # Realizar la transcripción del archivo descargado
+        logger.info("Iniciando transcripción del archivo descargado...")
         transcribed_text = transcribe_audio_file(downloaded_file_path)
+        logger.info("Transcripción completada exitosamente.")
 
     except yt_dlp.utils.DownloadError as e:
+        logger.error(f"Error al descargar el video de YouTube: {str(e)}")
         raise HTTPException(
             status_code=400,
-            detail=f"Error al descargar el video de YouTube: {str(e)}"
+            detail=(
+                "Error al descargar el video de YouTube. "
+                "Es posible que se requiera autenticación/cookies. "
+                "Consulta la documentación: "
+                "https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp"
+            )
         )
     except Exception as e:
+        logger.error(f"Ocurrió un error inesperado: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Ocurrió un error inesperado: {str(e)}"
@@ -241,6 +267,7 @@ async def youtube_url_transcribe(request: YouTubeURLRequest):
         # Limpiar el directorio temporal y su contenido
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
+            logger.info(f"Directorio temporal eliminado: {temp_dir}")
 
     return {"transcription": transcribed_text}
 
